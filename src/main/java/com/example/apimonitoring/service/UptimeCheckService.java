@@ -1,7 +1,9 @@
 package com.example.apimonitoring.service;
 
 import com.example.apimonitoring.model.MonitoredEndpoint;
+import com.example.apimonitoring.model.UptimeLog;
 import com.example.apimonitoring.repository.MonitoredEndpointRepository;
+import com.example.apimonitoring.repository.UptimeLogRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -12,13 +14,16 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class UptimeCheckService {
+
     private final MonitoredEndpointRepository endpointRepository;
+    private final UptimeLogRepository uptimeLogRepository;
 
     private final HttpClient  httpClient =  HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
@@ -59,8 +64,16 @@ public class UptimeCheckService {
             log.info("Sonuç -> URL: {}, Durum: {}, Kod: {}, Yanıt Süresi: {}ms",
                     endpoint.getUrl(), (isUp ? "AYAKTA" : "ÇÖKTÜ"), statusCode, responseTime);
 
-            // TODO: İlerleyen adımda bu veriyi Elasticsearch'e göndereceğiz
-            // elasticsearchLogService.savePingResult(endpoint.getId(), endpoint.getUserId(), isUp, statusCode, responseTime);
+            UptimeLog logEntry = UptimeLog.builder()
+                    .endpointId(endpoint.getId())
+                    .userId(endpoint.getUserId())
+                    .isUp(isUp)
+                    .statusCode(statusCode)
+                    .responseTimeMs(responseTime)
+                    .timestamp(Instant.now())
+                    .build();
+
+            uptimeLogRepository.save(logEntry);
         }
     }
 
